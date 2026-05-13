@@ -1,18 +1,17 @@
 {
   "name": "محلات للتجارة العامة",
   "short_name": "المحلات",
-  "lang": "ar",
-  "dir": "rtl",
-  "start_url": "./",
+  "start_url": "/index.html",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0a0a0c",
   "theme_color": "#d4af37",
+  "description": "نظام محاسبي متكامل يعمل بدون إنترنت",
   "icons": [
     {
-      "src": "https://www.svgrepo.com/show/530028/store.svg",
+      "src": "https://i.postimg.cc/9QLJBVcJ/1777228627401.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any"
+      "type": "image/png"
     }
   ]
 }

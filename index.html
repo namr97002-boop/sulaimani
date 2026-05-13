@@ -7,7 +7,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>محلات  للتجارة العامة</title>
-    
+<!-- ==================== PWA للتثبيت والعمل بدون نت ==================== -->
+<link rel="manifest" href="./manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="محلات">
+<link rel="apple-touch-icon" href="https://i.postimg.cc/9QLJBVcJ/1777228627401.png">
+    <!-- ==================== PWA للتثبيت والعمل بدون نت ==================== -->
+<link rel="manifest" href="./manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="محلات">
+<link rel="apple-touch-icon" href="https://i.postimg.cc/9QLJBVcJ/1777228627401.png">
     <!-- ==================== PWA MANIFEST ==================== -->
 
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -7649,68 +7660,66 @@ if ('serviceWorker' in navigator) {
     
     observer.observe(document.body, { childList: true, subtree: true });
 })();
-</script>
+</style>
+<!-- زر تثبيت التطبيق -->
 <script>
-let deferredPrompt;
-
-// تسجيل السيرفس وركر مع التأكد من أنه "نشط"
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').then(reg => {
-        console.log('SW Registered');
-    }).catch(err => console.log('SW Error:', err));
-}
-
-// محاولة صيد حدث التثبيت
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    console.log('Event captured!');
-    showMyBtn(); // إظهار الزر فوراً عند التقاط الحدث
-});
-
-function showMyBtn() {
-    // إذا كان الزر موجوداً مسبقاً لا تكرره
-    if (document.getElementById('forceInstallBtn')) return;
-
-    const btn = document.createElement('button');
-    btn.id = 'forceInstallBtn';
-    btn.innerHTML = '⚡ تثبيت النظام الآن';
-    btn.style.cssText = `
-        position:fixed; bottom:30px; left:50%; transform:translateX(-50%);
-        width:90%; max-width:400px; background:#d4af37; color:#000;
-        padding:18px; border-radius:15px; font-size:20px; font-weight:bold;
-        border:none; z-index:10000; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-        animation: pulse 1.5s infinite;
-    `;
-
-    document.body.appendChild(btn);
-
-    btn.onclick = () => {
-        if (deferredPrompt) {
-            deferredPrompt.prompt();
-            deferredPrompt.userChoice.then((choice) => {
-                if (choice.outcome === 'accepted') {
-                    btn.remove();
-                }
-            });
-        } else {
-            // في حال ضغط المستخدم ولم يلتقط المتصفح الحدث بعد
-            alert("المتصفح غير جاهز للتثبيت بعد، تأكد من استخدام Chrome وتحديث الصفحة.");
-        }
-    };
-}
-
-// أنيميشن لجعل الزر ملفت جداً
-const style = document.createElement('style');
-style.innerHTML = `
-    @keyframes pulse {
-        0% { transform: translateX(-50%) scale(1); }
-        50% { transform: translateX(-50%) scale(1.05); }
-        100% { transform: translateX(-50%) scale(1); }
+(function() {
+    let deferredPrompt;
+    
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        showInstallButton();
+    });
+    
+    function showInstallButton() {
+        if (document.getElementById('installBtn')) return;
+        
+        const btn = document.createElement('button');
+        btn.id = 'installBtn';
+        btn.innerHTML = '📱 تثبيت التطبيق';
+        btn.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #d4af37;
+            color: #000;
+            border: none;
+            padding: 14px 25px;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 16px;
+            z-index: 99999;
+            cursor: pointer;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            animation: blink 1s infinite;
+        `;
+        
+        btn.onclick = () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(() => btn.remove());
+            }
+        };
+        
+        document.body.appendChild(btn);
     }
-`;
-document.head.appendChild(style);
+    
+    // تسجيل Service Worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+            .then(() => console.log('✅ SW registered'))
+            .catch(err => console.log('SW error:', err));
+    }
+})();
 </script>
 
+<style>
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; transform: translateX(-50%) scale(1.02); }
+    }
+</style>
 </body>
 </html>
