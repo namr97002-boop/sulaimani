@@ -7650,5 +7650,101 @@ if ('serviceWorker' in navigator) {
     observer.observe(document.body, { childList: true, subtree: true });
 })();
 </script>
+<!-- ==================== زر تثبيت التطبيق (النسخة المحسنة) ==================== -->
+<script>
+    (function() {
+        let deferredPrompt;
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                             window.navigator.standalone === true;
+
+        if (isStandalone) {
+            console.log('✅ التطبيق يعمل بشكل مستقل');
+            return;
+        }
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            showInstallButton();
+        });
+
+        function showInstallButton() {
+            let btn = document.getElementById('pwa-install-btn');
+            if (btn) return;
+
+            btn = document.createElement('button');
+            btn.id = 'pwa-install-btn';
+            btn.innerHTML = '📲 تثبيت التطبيق';
+            btn.style.cssText = `
+                position: fixed;
+                bottom: 100px;
+                left: 20px;
+                right: 20px;
+                background: linear-gradient(145deg, #d4af37, #b38b2d);
+                color: #000;
+                border: none;
+                padding: 14px;
+                border-radius: 60px;
+                font-weight: bold;
+                font-size: 16px;
+                z-index: 99999;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+                cursor: pointer;
+                font-family: 'Tajawal', sans-serif;
+                text-align: center;
+            `;
+            
+            btn.onclick = async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        console.log('✅ تم تثبيت التطبيق');
+                        btn.remove();
+                    }
+                    deferredPrompt = null;
+                } else {
+                    alert('⚠️ يمكنك الإضافة يدوياً من قائمة المتصفح ↺ "أضف إلى الشاشة الرئيسية"');
+                }
+            };
+            document.body.appendChild(btn);
+            
+            setTimeout(() => {
+                if (btn && btn.parentNode) btn.remove();
+            }, 30000);
+        }
+        
+        setTimeout(() => {
+            if (!deferredPrompt && !document.getElementById('pwa-install-btn') && !isStandalone) {
+                const fallbackBtn = document.createElement('button');
+                fallbackBtn.innerHTML = '📱 إضافة إلى الشاشة الرئيسية';
+                fallbackBtn.style.cssText = `
+                    position: fixed;
+                    bottom: 100px;
+                    left: 20px;
+                    right: 20px;
+                    background: linear-gradient(145deg, #d4af37, #b38b2d);
+                    color: #000;
+                    border: none;
+                    padding: 14px;
+                    border-radius: 60px;
+                    font-weight: bold;
+                    font-size: 16px;
+                    z-index: 99999;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+                    cursor: pointer;
+                    font-family: 'Tajawal', sans-serif;
+                    text-align: center;
+                `;
+                fallbackBtn.onclick = () => {
+                    alert('📍 للتثبيت:\n\n1️⃣ استخدم متصفح كروم (Android) أو سفاري (iPhone)\n2️⃣ اضغط على القائمة (⋮ أو ☰)\n3️⃣ اختر "تثبيت التطبيق" أو "أضف إلى الشاشة الرئيسية"');
+                    fallbackBtn.remove();
+                };
+                document.body.appendChild(fallbackBtn);
+                setTimeout(() => fallbackBtn.remove(), 30000);
+            }
+        }, 3000);
+    })();
+</script>
 </body>
 </html>
