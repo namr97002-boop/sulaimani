@@ -7650,101 +7650,67 @@ if ('serviceWorker' in navigator) {
     observer.observe(document.body, { childList: true, subtree: true });
 })();
 </script>
-<!-- ==================== زر تثبيت التطبيق (النسخة المحسنة) ==================== -->
 <script>
-    (function() {
-        let deferredPrompt;
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                             window.navigator.standalone === true;
+let deferredPrompt;
 
-        if (isStandalone) {
-            console.log('✅ التطبيق يعمل بشكل مستقل');
-            return;
-        }
+// تسجيل السيرفس وركر مع التأكد من أنه "نشط"
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+        console.log('SW Registered');
+    }).catch(err => console.log('SW Error:', err));
+}
 
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            showInstallButton();
-        });
+// محاولة صيد حدث التثبيت
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    console.log('Event captured!');
+    showMyBtn(); // إظهار الزر فوراً عند التقاط الحدث
+});
 
-        function showInstallButton() {
-            let btn = document.getElementById('pwa-install-btn');
-            if (btn) return;
+function showMyBtn() {
+    // إذا كان الزر موجوداً مسبقاً لا تكرره
+    if (document.getElementById('forceInstallBtn')) return;
 
-            btn = document.createElement('button');
-            btn.id = 'pwa-install-btn';
-            btn.innerHTML = '📲 تثبيت التطبيق';
-            btn.style.cssText = `
-                position: fixed;
-                bottom: 100px;
-                left: 20px;
-                right: 20px;
-                background: linear-gradient(145deg, #d4af37, #b38b2d);
-                color: #000;
-                border: none;
-                padding: 14px;
-                border-radius: 60px;
-                font-weight: bold;
-                font-size: 16px;
-                z-index: 99999;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-                cursor: pointer;
-                font-family: 'Tajawal', sans-serif;
-                text-align: center;
-            `;
-            
-            btn.onclick = async () => {
-                if (deferredPrompt) {
-                    deferredPrompt.prompt();
-                    const { outcome } = await deferredPrompt.userChoice;
-                    if (outcome === 'accepted') {
-                        console.log('✅ تم تثبيت التطبيق');
-                        btn.remove();
-                    }
-                    deferredPrompt = null;
-                } else {
-                    alert('⚠️ يمكنك الإضافة يدوياً من قائمة المتصفح ↺ "أضف إلى الشاشة الرئيسية"');
+    const btn = document.createElement('button');
+    btn.id = 'forceInstallBtn';
+    btn.innerHTML = '⚡ تثبيت النظام الآن';
+    btn.style.cssText = `
+        position:fixed; bottom:30px; left:50%; transform:translateX(-50%);
+        width:90%; max-width:400px; background:#d4af37; color:#000;
+        padding:18px; border-radius:15px; font-size:20px; font-weight:bold;
+        border:none; z-index:10000; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        animation: pulse 1.5s infinite;
+    `;
+
+    document.body.appendChild(btn);
+
+    btn.onclick = () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choice) => {
+                if (choice.outcome === 'accepted') {
+                    btn.remove();
                 }
-            };
-            document.body.appendChild(btn);
-            
-            setTimeout(() => {
-                if (btn && btn.parentNode) btn.remove();
-            }, 30000);
+            });
+        } else {
+            // في حال ضغط المستخدم ولم يلتقط المتصفح الحدث بعد
+            alert("المتصفح غير جاهز للتثبيت بعد، تأكد من استخدام Chrome وتحديث الصفحة.");
         }
-        
-        setTimeout(() => {
-            if (!deferredPrompt && !document.getElementById('pwa-install-btn') && !isStandalone) {
-                const fallbackBtn = document.createElement('button');
-                fallbackBtn.innerHTML = '📱 إضافة إلى الشاشة الرئيسية';
-                fallbackBtn.style.cssText = `
-                    position: fixed;
-                    bottom: 100px;
-                    left: 20px;
-                    right: 20px;
-                    background: linear-gradient(145deg, #d4af37, #b38b2d);
-                    color: #000;
-                    border: none;
-                    padding: 14px;
-                    border-radius: 60px;
-                    font-weight: bold;
-                    font-size: 16px;
-                    z-index: 99999;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-                    cursor: pointer;
-                    font-family: 'Tajawal', sans-serif;
-                    text-align: center;
-                `;
-                fallbackBtn.onclick = () => {
-                    alert('📍 للتثبيت:\n\n1️⃣ استخدم متصفح كروم (Android) أو سفاري (iPhone)\n2️⃣ اضغط على القائمة (⋮ أو ☰)\n3️⃣ اختر "تثبيت التطبيق" أو "أضف إلى الشاشة الرئيسية"');
-                    fallbackBtn.remove();
-                };
-                document.body.appendChild(fallbackBtn);
-                setTimeout(() => fallbackBtn.remove(), 30000);
-            }
-        }, 3000);
-    })();
+    };
+}
+
+// أنيميشن لجعل الزر ملفت جداً
+const style = document.createElement('style');
+style.innerHTML = `
+    @keyframes pulse {
+        0% { transform: translateX(-50%) scale(1); }
+        50% { transform: translateX(-50%) scale(1.05); }
+        100% { transform: translateX(-50%) scale(1); }
+    }
+`;
+document.head.appendChild(style);
 </script>
+
 </body>
 </html>
