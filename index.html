@@ -1623,6 +1623,131 @@ input, select, textarea {
     filter: brightness(1.1);
     transition: all 0.3s ease;
 }
+/* ==================== الوضع الليلي والنهاري ==================== */
+:root {
+    --bg-body: #0a0a0c;
+    --bg-card: #161625;
+    --text-main: #ffffff;
+    --text-secondary: #aaaaaa;
+    --border-light: #333;
+    --input-bg: #222;
+    --gold-color: #d4af37;
+    --gold-dark: #b38b2d;
+}
+
+[data-theme="light"] {
+    --bg-body: #f5f7fa;
+    --bg-card: #ffffff;
+    --text-main: #1e293b;
+    --text-secondary: #64748b;
+    --border-light: #e2e8f0;
+    --input-bg: #f1f5f9;
+    --gold-color: #d4af37;
+    --gold-dark: #b38b2d;
+}
+
+/* تطبيق الألوان */
+body {
+    background: var(--bg-body) !important;
+    color: var(--text-main) !important;
+    transition: all 0.3s ease !important;
+}
+
+.glass-card {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--gold-color) !important;
+    transition: all 0.3s ease !important;
+}
+
+input, select, textarea {
+    background: var(--input-bg) !important;
+    color: var(--text-main) !important;
+    border-color: var(--border-light) !important;
+}
+
+#main-system, .modal .glass-card {
+    background: var(--bg-card) !important;
+}
+
+table th {
+    color: var(--gold-color) !important;
+}
+table td {
+    color: var(--text-main) !important;
+    border-bottom-color: var(--border-light) !important;
+}
+
+#connectionStatus {
+    background: var(--bg-card) !important;
+    border-color: var(--border-light) !important;
+    color: var(--text-main) !important;
+}
+
+.shop-title h1, .shop-title h3 {
+    color: var(--gold-color) !important;
+}
+
+.stat-card {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-light) !important;
+}
+
+.stat-value {
+    color: var(--gold-color) !important;
+}
+
+.invoice-box {
+    background: var(--bg-card) !important;
+    border-color: var(--border-light) !important;
+}
+
+.btn {
+    color: white !important;
+}
+
+.btn-gold {
+    background: var(--gold-color) !important;
+    color: black !important;
+}
+
+.btn-outline {
+    border-color: var(--gold-color) !important;
+    color: var(--gold-color) !important;
+}
+
+.tab-btn {
+    background: var(--input-bg) !important;
+    color: var(--text-main) !important;
+}
+
+.tab-btn.active {
+    border-color: var(--gold-color) !important;
+    color: var(--gold-color) !important;
+}
+
+/* زر التبديل */
+.theme-toggle-btn {
+    position: fixed !important;
+    top: 15px !important;
+    left: 15px !important;
+    z-index: 999999 !important;
+    background: var(--gold-color) !important;
+    border: none !important;
+    border-radius: 50px !important;
+    width: 45px !important;
+    height: 45px !important;
+    font-size: 22px !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+    transition: 0.3s !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.theme-toggle-btn:hover {
+    transform: scale(1.05) !important;
+}
 </style>
 </head>
 <body>
@@ -5438,7 +5563,7 @@ window.exportStatementToPDF = async function() {
             <p style="color:#666;">تاريخ التقرير: ${new Date().toLocaleString('ar-YE')}</p>
         </div>
         <div style="background:#f5f5f5; padding:15px; border-radius:10px; margin-bottom:20px;">
-            <h3 style="margin:0; color:#000;">👤 ${contact.full_name}</h3>
+            <h3 style="margin:0; color:#000;">?? ${contact.full_name}</h3>
             <p style="margin:5px 0; color:#555;">${contact.contact_type === 'customer' ? 'عميل' : 'مورد'} | ${contact.phone || 'لا يوجد هاتف'}</p>
             <p style="margin:5px 0; font-size:18px; font-weight:bold; color:${finalBalance > 0 ? '#10b981' : (finalBalance < 0 ? '#ef4444' : '#d4af37')};">الرصيد الحالي: ${Math.abs(finalBalance).toLocaleString()} ريال ${finalBalance > 0 ? '(له)' : (finalBalance < 0 ? '(عليه)' : '')}</p>
         </div>
@@ -8977,6 +9102,270 @@ if ('serviceWorker' in navigator) {
     
     observer.observe(document.body, { childList: true, subtree: true });
 })();
+</script>
+<script>
+// ==================== الوضع الليلي والنهاري (نسخة تعمل 100%) ====================
+(function() {
+    const THEME_KEY = 'app_theme_mode';
+    
+    function setTheme(theme) {
+        if (theme === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+            localStorage.setItem(THEME_KEY, 'light');
+            const btn = document.getElementById('themeToggleBtn');
+            if (btn) btn.innerHTML = '☀️';
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+            localStorage.setItem(THEME_KEY, 'dark');
+            const btn = document.getElementById('themeToggleBtn');
+            if (btn) btn.innerHTML = '🌙';
+        }
+        console.log('✅ تم التبديل إلى الوضع:', theme);
+    }
+    
+    window.toggleTheme = function() {
+        const current = localStorage.getItem(THEME_KEY);
+        if (current === 'light') {
+            setTheme('dark');
+        } else {
+            setTheme('light');
+        }
+    };
+    
+    // تحميل الوضع المحفوظ
+    const savedTheme = localStorage.getItem(THEME_KEY);
+    if (savedTheme === 'light') {
+        setTheme('light');
+    } else {
+        setTheme('dark');
+    }
+    
+    // إضافة الزر
+    function addButton() {
+        if (document.getElementById('themeToggleBtn')) return;
+        const btn = document.createElement('button');
+        btn.id = 'themeToggleBtn';
+        btn.className = 'theme-toggle-btn';
+        btn.innerHTML = localStorage.getItem(THEME_KEY) === 'light' ? '☀️' : '🌙';
+        btn.onclick = toggleTheme;
+        document.body.appendChild(btn);
+        console.log('✅ تم إضافة الزر');
+    }
+    
+    if (document.body) {
+        addButton();
+    } else {
+        document.addEventListener('DOMContentLoaded', addButton);
+    }
+})();
+</script>
+<script>
+// ==================== تحميل مسبق لبيانات الفاتورة ====================
+(function() {
+    let preloadedProducts = null;
+    let preloadedContacts = null;
+    
+    async function preloadInvoiceData() {
+        if (!preloadedProducts) {
+            preloadedProducts = await productsStore.getAll();
+            preloadedContacts = await contactsStore.getAll();
+            console.log('✅ تم التحميل المسبق للفاتورة');
+        }
+    }
+    
+    // تحميل فور ظهور النظام الرئيسي
+    const origInit = window.initMainSystem;
+    window.initMainSystem = async function() {
+        if (origInit) await origInit();
+        preloadInvoiceData();
+    };
+    
+    // تسريع دالة setupInvoice
+    const origSetup = window.setupInvoice;
+    if (origSetup) {
+        window.setupInvoice = function(type, mode) {
+            preloadInvoiceData();
+            return origSetup(type, mode);
+        };
+    }
+})();
+</script>
+<script>
+// ==================== إشعار صوتي عند حفظ الفاتورة ====================
+function playSuccessSound() {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 880;
+        gainNode.gain.value = 0.3;
+        
+        oscillator.start();
+        gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.5);
+        oscillator.stop(audioContext.currentTime + 0.5);
+        
+        setTimeout(() => audioContext.close(), 600);
+    } catch(e) {
+        // إذا فشل الصوت، نستخدم اهتزاز إذا كان متاحاً
+        if (navigator.vibrate) {
+            navigator.vibrate(200);
+        }
+    }
+}
+
+// دمج الصوت مع حفظ الفاتورة
+const originalSaveNow = window.saveNow;
+window.saveNow = async function() {
+    const result = await originalSaveNow();
+    playSuccessSound();
+    return result;
+};
+</script>
+<script>
+// ==================== تحسين عرض إجمالي الفاتورة ====================
+(function() {
+    function enhanceTotalDisplay() {
+        const totalDiv = document.getElementById('totalTxt');
+        if (totalDiv && !totalDiv.classList.contains('enhanced')) {
+            totalDiv.classList.add('enhanced');
+            totalDiv.style.cssText = `
+                font-size: 28px !important;
+                font-weight: bold !important;
+                background: linear-gradient(135deg, #d4af37, #ffd700) !important;
+                color: #000 !important;
+                text-align: center !important;
+                padding: 12px !important;
+                border-radius: 60px !important;
+                margin: 15px 0 !important;
+                animation: pulse 1.5s ease infinite !important;
+            `;
+        }
+    }
+    
+    // مراقبة ظهور نافذة الفاتورة
+    const observer = new MutationObserver(() => {
+        const modal = document.getElementById('invoiceModal');
+        if (modal && modal.style.display === 'block') {
+            setTimeout(enhanceTotalDisplay, 100);
+        }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+})();
+</script>
+<script>
+// ==================== عرض إجمالي الفواتير غير المسددة ====================
+async function addUnpaidTotalToBalances() {
+    const invoices = await invoicesStore.getAll();
+    
+    let totalUnpaid = 0;
+    let customerUnpaid = 0;
+    let supplierUnpaid = 0;
+    
+    for (const inv of invoices) {
+        const remaining = (inv.total_amount || 0) - (inv.paid_amount || 0);
+        if (remaining > 0) {
+            totalUnpaid += remaining;
+            if (inv.invoice_type === 'sale') customerUnpaid += remaining;
+            else if (inv.invoice_type === 'purchase') supplierUnpaid += remaining;
+        }
+    }
+    
+    const balancesTab = document.getElementById('balancesTab');
+    if (balancesTab && !document.getElementById('unpaidSummary')) {
+        const summaryDiv = document.createElement('div');
+        summaryDiv.id = 'unpaidSummary';
+        summaryDiv.style.cssText = 'display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;';
+        summaryDiv.innerHTML = `
+            <div class="stat-card" style="background:#1e1e30;">
+                <div>💰 إجمالي غير مسدد</div>
+                <div class="stat-value" style="color:#ef4444;">${totalUnpaid.toLocaleString()} ريال</div>
+            </div>
+            <div class="stat-card" style="background:#1e1e30;">
+                <div>👤 مديونية العملاء</div>
+                <div class="stat-value" style="color:#f59e0b;">${customerUnpaid.toLocaleString()} ريال</div>
+            </div>
+        `;
+        
+        const firstChild = balancesTab.firstChild;
+        balancesTab.insertBefore(summaryDiv, firstChild);
+    }
+}
+
+// دمج مع loadData
+const originalLoadData = window.loadData;
+window.loadData = async function() {
+    if (originalLoadData) await originalLoadData();
+    await addUnpaidTotalToBalances();
+};
+</script>
+<script>
+// ==================== إضافة عداد المنتجات في قائمة الأسعار ====================
+const originalOpenPriceManager = window.openPriceManager;
+
+window.openPriceManager = async function() {
+    if (originalOpenPriceManager) await originalOpenPriceManager();
+    
+    setTimeout(() => {
+        const modal = document.getElementById('priceManagerModal');
+        if (!modal) return;
+        
+        // منع الإضافة مرتين
+        if (document.getElementById('productsCountBadge')) return;
+        
+        const header = modal.querySelector('h3');
+        if (header) {
+            const count = cachedProducts.length;
+            const badge = document.createElement('span');
+            badge.id = 'productsCountBadge';
+            badge.style.cssText = `
+                background: #d4af37;
+                color: #000;
+                padding: 4px 12px;
+                border-radius: 40px;
+                font-size: 14px;
+                margin-right: 10px;
+            `;
+            badge.innerHTML = `📦 ${count} منتج`;
+            header.appendChild(badge);
+        }
+    }, 300);
+};
+</script>
+<script>
+// ==================== تحسين تنبيه المخزون المنخفض ====================
+const originalAddToGrid = window.addToGrid;
+
+window.addToGrid = function() {
+    const prodSelect = document.getElementById('prodSelect');
+    const qtyInput = document.getElementById('qty');
+    
+    const productId = prodSelect?.value;
+    const quantity = parseFloat(qtyInput?.value) || 0;
+    
+    if (productId && quantity > 0) {
+        const product = cachedProducts.find(p => p.id === productId);
+        
+        // للبيع فقط (وليس شراء أو مرتجع)
+        if (activeType === 'sale' && product) {
+            const currentStock = product.stock_quantity || 0;
+            
+            if (quantity > currentStock) {
+                showToast(`⚠️ المخزون غير كافٍ!\nالمتوفر: ${currentStock} | المطلوب: ${quantity}`, 'error');
+                return;
+            }
+            
+            if (currentStock <= 5) {
+                showToast(`📦 تنبيه: المخزون منخفض لـ "${product.name}"\nالمتبقي: ${currentStock}`, 'warning');
+            }
+        }
+    }
+    
+    if (originalAddToGrid) originalAddToGrid();
+};
 </script>
 </body>
 </html>
