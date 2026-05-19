@@ -9757,5 +9757,109 @@ window.addToGrid = function() {
     console.log('✅ واتساب يعمل - الاسم الديناميكي: ' + getStoreName());
 })();
 </script>
+<script>
+// ============================================================
+// واتساب - إصلاح تذكير المديونية (إرسال المبلغ)
+// ============================================================
+(function() {
+    'use strict';
+
+    // جلب اسم المحل الديناميكي
+    function getStoreName() {
+        let name = localStorage.getItem('storeName');
+        if (!name) name = localStorage.getItem('custom_store_name');
+        if (!name) {
+            const title = document.querySelector('#main-system .shop-title h1');
+            if (title) name = title.innerText.replace('🏪', '').trim();
+        }
+        return name || 'محلات سليمان للتجارة العامة';
+    }
+
+    // تنظيف رقم الهاتف
+    function cleanPhone(phone) {
+        if (!phone) return null;
+        let numbers = phone.toString().trim().replace(/[^0-9]/g, '');
+        if (!numbers || numbers.length < 8) return null;
+        if (numbers.length === 9 && numbers.startsWith('7')) {
+            numbers = '967' + numbers;
+        } else if (numbers.startsWith('0')) {
+            numbers = '967' + numbers.substring(1);
+        } else if (!numbers.startsWith('967')) {
+            numbers = '967' + numbers;
+        }
+        return numbers;
+    }
+
+    // إرسال واتساب
+    window.sendWA = function(phone, message) {
+        const clean = cleanPhone(phone);
+        if (!clean) {
+            if (typeof showToast === 'function') showToast('⚠️ رقم غير صالح', 'error');
+            else alert('رقم غير صالح');
+            return false;
+        }
+        window.open(`https://wa.me/${clean}?text=${encodeURIComponent(message)}`, '_blank');
+        if (typeof showToast === 'function') showToast('📱 تم فتح واتساب', 'success');
+        return true;
+    };
+
+    // ========== إصلاح دالة تذكير الديون ==========
+    // نستبدل الدالة القديمة بالكامل
+    window.sendDebtReminder = function(contactId, contactName, contactType, balance, phone) {
+        console.log('📞 تذكير دين:', { contactId, contactName, contactType, balance, phone });
+        
+        // التحقق من وجود رقم الهاتف
+        if (!phone || phone === '-' || phone === 'غير مسجل') {
+            if (typeof showToast === 'function') {
+                showToast('⚠️ لا يوجد رقم هاتف مسجل لهذا الاسم', 'error');
+            } else {
+                alert('لا يوجد رقم هاتف مسجل');
+            }
+            return;
+        }
+        
+        // التأكد من أن المبلغ رقم صحيح
+        const balanceNum = parseFloat(balance) || 0;
+        const formattedBalance = Math.abs(balanceNum).toLocaleString();
+        const storeName = getStoreName();
+        
+        // بناء نص المديونية حسب النوع
+        let debtText = '';
+        if (contactType === 'customer') {
+            // عميل
+            if (balanceNum > 0) {
+                debtText = `عليك مبلغ وقدره ${formattedBalance} ريال`;
+            } else if (balanceNum < 0) {
+                debtText = `لك مبلغ وقدره ${formattedBalance} ريال`;
+            } else {
+                debtText = `لا توجد أي مديونية`;
+            }
+        } else {
+            // مورد
+            if (balanceNum < 0) {
+                debtText = `لنا عندك مبلغ وقدره ${formattedBalance} ريال`;
+            } else if (balanceNum > 0) {
+                debtText = `لك علينا مبلغ وقدره ${formattedBalance} ريال`;
+            } else {
+                debtText = `لا توجد أي مديونية`;
+            }
+        }
+        
+        // بناء الرسالة النهائية
+        const msg = `${storeName}\nتسوية حساب\nالاسم: ${contactName}\nالمبلغ: ${debtText}\nالتاريخ: ${new Date().toLocaleDateString('ar-YE')}`;
+        
+        // سؤال المستخدم: واتساب أو SMS
+        const useWhatsApp = confirm(`📱 إرسال رسالة إلى ${contactName} عبر واتساب؟\n\n"موافق" = واتساب\n"إلغاء" = رسالة SMS`);
+        
+        if (useWhatsApp) {
+            window.sendWA(phone, msg);
+        } else {
+            window.location.href = `sms:${phone}?body=${encodeURIComponent(msg)}`;
+        }
+    };
+
+    console.log('✅ تم إصلاح تذكير المديونية - سيرسل المبلغ بشكل صحيح');
+})();
+</script>
 </body>
 </html>
