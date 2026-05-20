@@ -9391,386 +9391,135 @@ window.addToGrid = function() {
     if (originalAddToGrid) originalAddToGrid();
 };
 </script>
+
 <script>
 // ============================================================
-// واتساب - كشف الحساب والمديونية (اسم المحل ديناميكي 100%)
+// إضافة زر واتساب في جدول الأسماء والمديونية (للتذكير بالمبلغ)
 // ============================================================
 (function() {
     'use strict';
 
-    // ========== دالة جلب اسم المحل من النظام (ديناميكي) ==========
-    function getStoreName() {
-        // أولاً: جلب من localStorage (المكان الأساسي الذي يخزن فيه النظام اسم المحل)
-        let name = localStorage.getItem('storeName');
-        
-        // ثانياً: محاولة المفتاح الآخر
-        if (!name) {
-            name = localStorage.getItem('custom_store_name');
-        }
-        
-        // ثالثاً: جلب من واجهة المستخدم مباشرة
-        if (!name) {
-            const titleElement = document.querySelector('#main-system .shop-title h1');
-            if (titleElement && titleElement.innerText) {
-                // إزالة أيقونة المتجر
-                let uiName = titleElement.innerText.replace('🏪', '').trim();
-                if (uiName && uiName !== '') {
-                    name = uiName;
-                    // تحديث localStorage ليتوافق
-                    localStorage.setItem('storeName', name);
-                    localStorage.setItem('custom_store_name', name);
-                }
-            }
-        }
-        
-        // القيمة الافتراضية (تظهر فقط عند عدم وجود أي اسم)
-        return name || 'محلات سليمان للتجارة العامة';
-    }
-
-    // تحديث الاسم في localStorage عند تغييره من النظام
-    function syncStoreName() {
-        const currentName = getStoreName();
-        localStorage.setItem('storeName', currentName);
-        localStorage.setItem('custom_store_name', currentName);
-        return currentName;
-    }
-
-    // ========== تنظيف رقم الهاتف (لليمن 967) ==========
+    // تنظيف رقم الجوال لليمن
     function cleanPhone(phone) {
         if (!phone) return null;
         let numbers = phone.toString().trim().replace(/[^0-9]/g, '');
         if (!numbers || numbers.length < 8) return null;
-        if (numbers.length === 9 && numbers.startsWith('7')) {
-            numbers = '967' + numbers;
-        } else if (numbers.startsWith('0')) {
-            numbers = '967' + numbers.substring(1);
-        } else if (!numbers.startsWith('967')) {
-            numbers = '967' + numbers;
-        }
+        if (numbers.length === 9 && numbers.startsWith('7')) numbers = '967' + numbers;
+        else if (numbers.startsWith('0')) numbers = '967' + numbers.substring(1);
+        else if (!numbers.startsWith('967')) numbers = '967' + numbers;
         return numbers;
     }
 
-    // ========== إرسال واتساب ==========
-    window.sendWA = function(phone, message) {
+    // إرسال رسالة واتساب
+    function sendWADebt(phone, name, balance, type) {
         const clean = cleanPhone(phone);
         if (!clean) {
-            if (typeof showToast === 'function') showToast('⚠️ رقم الهاتف غير صالح', 'error');
-            else alert('رقم الهاتف غير صالح');
-            return false;
-        }
-        const url = `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
-        window.open(url, '_blank');
-        if (typeof showToast === 'function') showToast('📱 تم فتح واتساب', 'success');
-        return true;
-    };
-
-    // ========== 1. تحديث دالة تذكير الديون (مع اسم المحل الديناميكي) ==========
-    if (typeof window.sendDebtReminder === 'function') {
-        const originalReminder = window.sendDebtReminder;
-        window.sendDebtReminder = function(contactId, contactName, contactType, balance, phone) {
-            if (!phone) {
-                if (typeof showToast === 'function') showToast('⚠️ لا يوجد رقم هاتف', 'error');
-                return;
-            }
-            
-            // جلب اسم المحل مباشرة
-            const storeName = getStoreName();
-            const formattedBalance = Math.abs(balance).toLocaleString();
-            
-            let debtText = '';
-            if (contactType === 'customer') {
-                if (balance > 0) debtText = `عليك مبلغ وقدره ${formattedBalance} ريال`;
-                else if (balance < 0) debtText = `لك مبلغ وقدره ${formattedBalance} ريال`;
-                else debtText = `لا توجد أي مديونية`;
-            } else {
-                if (balance < 0) debtText = `لنا عندك مبلغ وقدره ${formattedBalance} ريال`;
-                else if (balance > 0) debtText = `لك علينا مبلغ وقدره ${formattedBalance} ريال`;
-                else debtText = `لا توجد أي مديونية`;
-            }
-            
-            const msg = `${storeName}\nتسوية حساب\nالاسم: ${contactName}\nالمبلغ: ${debtText}\nالتاريخ: ${new Date().toLocaleDateString('ar-YE')}`;
-            
-            const useWhatsApp = confirm(`📱 إرسال رسالة إلى ${contactName} عبر واتساب؟\n\n"موافق" = واتساب\n"إلغاء" = SMS`);
-            
-            if (useWhatsApp) {
-                window.sendWA(phone, msg);
-            } else {
-                window.location.href = `sms:${phone}?body=${encodeURIComponent(msg)}`;
-            }
-        };
-    }
-
-    // ========== 2. جلب بيانات كشف الحساب الكاملة ==========
-    async function getFullStatementData(contactId) {
-        // جلب الفواتير
-        const invKeys = await invoicesStore.keys();
-        const invoices = [];
-        for (const k of invKeys) {
-            const inv = await invoicesStore.getItem(k);
-            if (inv && inv.contact_id === contactId) invoices.push(inv);
-        }
-        invoices.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        
-        // جلب السندات
-        const payKeys = await paymentsStore.keys();
-        const payments = [];
-        for (const k of payKeys) {
-            const p = await paymentsStore.getItem(k);
-            if (p && p.contact_id === contactId) payments.push(p);
-        }
-        payments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        
-        // جلب تفاصيل الأصناف
-        const allItems = [];
-        const itemKeys = await invoiceItemsStore.keys();
-        for (const k of itemKeys) {
-            const item = await invoiceItemsStore.getItem(k);
-            if (item) allItems.push(item);
+            alert('⚠️ رقم الهاتف غير صالح');
+            return;
         }
         
-        // حساب الإجماليات
-        let totalInvoices = 0, totalReceipts = 0, totalPayments = 0;
-        invoices.forEach(inv => totalInvoices += inv.total_amount || 0);
-        payments.forEach(p => {
-            if (p.payment_type === 'receipt') totalReceipts += p.amount || 0;
-            else totalPayments += p.amount || 0;
-        });
+        const storeName = localStorage.getItem('storeName') || 'محلات نصر العامري';
+        const formattedBalance = Math.abs(balance).toLocaleString();
         
-        return { invoices, payments, allItems, totalInvoices, totalReceipts, totalPayments };
-    }
-
-    // ========== 3. إنشاء رسالة كشف الحساب الكاملة ==========
-    async function generateFullStatementMessage(contact) {
-        const data = await getFullStatementData(contact.id);
-        const storeName = getStoreName();
-        const now = new Date();
-        const dateStr = now.toLocaleDateString('ar-YE');
-        const timeStr = now.toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' });
-        
-        let message = `🏪 ${storeName}\n`;
-        message += `📊 كشف حساب تفصيلي\n`;
-        message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-        message += `👤 الاسم: ${contact.full_name}\n`;
-        message += `📌 النوع: ${contact.contact_type === 'customer' ? 'عميل' : 'مورد'}\n`;
-        message += `📞 الهاتف: ${contact.phone || 'غير مسجل'}\n`;
-        message += `📅 التاريخ: ${dateStr} - ${timeStr}\n`;
-        message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-        
-        // ========== الفواتير ==========
-        if (data.invoices.length > 0) {
-            message += `📋 الفواتير (${data.invoices.length}):\n`;
-            for (const inv of data.invoices) {
-                let typeText = '';
-                let typeIcon = '';
-                if (inv.invoice_type === 'sale') { typeText = 'فاتورة بيع'; typeIcon = '💰'; }
-                else if (inv.invoice_type === 'purchase') { typeText = 'فاتورة شراء'; typeIcon = '🛒'; }
-                else if (inv.invoice_type === 'sale_return') { typeText = 'مرتجع بيع'; typeIcon = '🔄'; }
-                else { typeText = 'مرتجع شراء'; typeIcon = '↩️'; }
-                
-                const invDate = new Date(inv.created_at).toLocaleDateString('ar-YE');
-                const remaining = (inv.total_amount || 0) - (inv.paid_amount || 0);
-                
-                message += `\n${typeIcon} ${typeText}\n`;
-                message += `   📅 التاريخ: ${invDate}\n`;
-                message += `   🆔 رقم: ${inv.id.toString().substring(0, 10)}...\n`;
-                
-                // الأصناف
-                const invoiceItems = data.allItems.filter(item => item.invoice_id === inv.id);
-                if (invoiceItems.length > 0) {
-                    message += `   📦 الأصناف:\n`;
-                    for (const item of invoiceItems) {
-                        const product = cachedProducts.find(p => p.id === item.product_id);
-                        const itemTotal = (item.quantity || 0) * (item.unit_price || 0);
-                        message += `      • ${product?.name || 'منتج'} | ${item.quantity} × ${item.unit_price.toLocaleString()} = ${itemTotal.toLocaleString()} ريال\n`;
-                    }
-                }
-                
-                message += `   💵 الإجمالي: ${(inv.total_amount || 0).toLocaleString()} ريال\n`;
-                message += `   ✅ المدفوع: ${(inv.paid_amount || 0).toLocaleString()} ريال\n`;
-                message += `   📋 المتبقي: ${remaining.toLocaleString()} ريال\n`;
-            }
-            message += `\n`;
+        let debtText = '';
+        if (type === 'customer') {
+            if (balance > 0) debtText = `❗ عليك مبلغ: ${formattedBalance} ريال`;
+            else if (balance < 0) debtText = `✅ لك مبلغ: ${formattedBalance} ريال`;
+            else debtText = `✅ لا توجد مديونية`;
         } else {
-            message += `📋 لا توجد فواتير مسجلة\n\n`;
+            if (balance < 0) debtText = `❗ علينا مبلغ: ${formattedBalance} ريال`;
+            else if (balance > 0) debtText = `✅ لنا مبلغ: ${formattedBalance} ريال`;
+            else debtText = `✅ لا توجد مديونية`;
         }
         
-        // ========== السندات ==========
-        if (data.payments.length > 0) {
-            message += `💰 السندات (${data.payments.length}):\n`;
-            for (const p of data.payments) {
-                const pDate = new Date(p.created_at).toLocaleDateString('ar-YE');
-                const pType = p.payment_type === 'receipt' ? 'سند قبض' : 'سند صرف';
-                const pIcon = p.payment_type === 'receipt' ? '📥' : '📤';
-                message += `   ${pIcon} ${pType} | ${pDate} | ${(p.amount || 0).toLocaleString()} ريال\n`;
-                if (p.notes && p.notes.trim()) {
-                    message += `      📝 ملاحظات: ${p.notes}\n`;
-                }
-            }
-            message += `\n`;
-        } else {
-            message += `💰 لا توجد سندات مسجلة\n\n`;
-        }
+        const msg = `${storeName}\n━━━━━━━━━━━━\n📋 تذكير\n👤 ${name}\n💰 ${debtText}\n📅 ${new Date().toLocaleDateString('ar-YE')}\n━━━━━━━━━━━━\n🤝 شكراً`;
         
-        // ========== الإجماليات النهائية ==========
-        const finalBalance = contact.balance || 0;
-        message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-        message += `📊 الإجماليات النهائية:\n`;
-        message += `   📋 إجمالي الفواتير: ${data.totalInvoices.toLocaleString()} ريال\n`;
-        message += `   📥 إجمالي سندات القبض: ${data.totalReceipts.toLocaleString()} ريال\n`;
-        message += `   📤 إجمالي سندات الصرف: ${data.totalPayments.toLocaleString()} ريال\n`;
-        message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-        
-        if (finalBalance > 0) {
-            message += `💎 الرصيد المتبقي: ${finalBalance.toLocaleString()} ريال (على العميل)\n`;
-        } else if (finalBalance < 0) {
-            message += `💎 الرصيد المتبقي: ${Math.abs(finalBalance).toLocaleString()} ريال (لصالح العميل)\n`;
-        } else {
-            message += `💎 الرصيد: 0 ريال (مسدد بالكامل)\n`;
-        }
-        
-        message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-        message += `📱 تم الإرسال عبر ${storeName}\n`;
-        message += `🤝 شكراً لتعاملكم معنا`;
-        
-        return message;
+        window.open(`https://wa.me/${clean}?text=${encodeURIComponent(msg)}`, '_blank');
     }
 
-    // ========== 4. إضافة زر واتساب في كشف الحساب ==========
-    function addWAStatementBtn() {
-        const modal = document.getElementById('statementModal');
-        if (!modal) return;
-        
-        const pdfBtn = modal.querySelector('.btn-pdf');
-        if (!pdfBtn || document.getElementById('waStatementBtn')) return;
-        
-        const waBtn = document.createElement('button');
-        waBtn.id = 'waStatementBtn';
-        waBtn.className = 'btn';
-        waBtn.style.cssText = 'background:#25D366;color:white;margin-left:10px;border-radius:60px;padding:10px 15px;cursor:pointer;border:none;';
-        waBtn.innerHTML = '<i class="fab fa-whatsapp"></i> 📱 إرسال كشف الحساب كاملاً';
-        
-        waBtn.onclick = async () => {
-            // الحصول على اسم العميل/المورد
-            let contactName = null;
-            const nameElement = document.querySelector('#statementResult .statement-header h3');
-            if (nameElement) contactName = nameElement.innerText.trim();
-            if (!contactName) {
-                const input = document.getElementById('statementSearchInput');
-                if (input && input.value) contactName = input.value.trim();
-            }
-            
-            if (!contactName) {
-                alert('⚠️ الرجاء عرض كشف حساب أولاً (ابحث عن اسم ثم اضغط عرض)');
-                return;
-            }
-            
-            // البحث عن جهة الاتصال
-            const contact = cachedContacts.find(c => c.full_name === contactName || c.full_name.includes(contactName));
-            if (!contact) {
-                alert('⚠️ لم يتم العثور على الاسم');
-                return;
-            }
-            
-            if (!contact.phone) {
-                alert('⚠️ لا يوجد رقم هاتف مسجل لهذا الاسم');
-                return;
-            }
-            
-            // إنشاء رسالة كشف الحساب الكاملة
-            const message = await generateFullStatementMessage(contact);
-            window.sendWA(contact.phone, message);
-        };
-        
-        pdfBtn.parentNode.insertBefore(waBtn, pdfBtn);
-    }
-
-    // ========== 5. أزرار واتساب في الجداول ==========
-    function addWATableBtns() {
-        ['contactsList', 'balancesDetailedList'].forEach(tableId => {
-            const table = document.getElementById(tableId);
-            if (!table) return;
-            
-            const rows = table.querySelectorAll('tr');
+    // إضافة الأزرار إلى الجداول
+    function addWAButtons() {
+        // جدول الأسماء (contactsList)
+        const contactsTable = document.getElementById('contactsList');
+        if (contactsTable) {
+            const rows = contactsTable.querySelectorAll('tr');
             rows.forEach(row => {
                 const cells = row.querySelectorAll('td');
-                if (cells.length < 5) return;
-                if (row.querySelector('.wa-tbl-btn')) return;
-                
-                const phone = cells[2]?.innerText?.trim();
-                const name = cells[0]?.innerText?.trim();
-                
-                if (!phone || phone === '-' || phone === 'غير مسجل') return;
-                if (!name) return;
-                
-                const waBtn = document.createElement('button');
-                waBtn.className = 'btn wa-tbl-btn';
-                waBtn.style.cssText = 'background:#25D366;color:white;margin-left:5px;padding:6px 10px;border-radius:8px;border:none;cursor:pointer;';
-                waBtn.innerHTML = '<i class="fab fa-whatsapp"></i>';
-                waBtn.title = 'إرسال رسالة واتساب';
-                
-                waBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    const store = getStoreName();
-                    const msg = `مرحباً ${name}\nهذه رسالة من ${store}`;
-                    window.sendWA(phone, msg);
-                };
-                
-                cells[4].insertBefore(waBtn, cells[4].firstChild);
+                if (cells.length >= 5 && !row.querySelector('.wa-new-btn')) {
+                    const name = cells[0]?.innerText || '';
+                    const phone = cells[2]?.innerText || '';
+                    const balanceText = cells[3]?.innerText?.replace(/[^0-9-]/g, '') || '0';
+                    const balance = parseFloat(balanceText) || 0;
+                    const type = cells[1]?.innerText === 'عميل' ? 'customer' : 'supplier';
+                    
+                    if (phone && phone !== '-' && phone !== 'غير مسجل') {
+                        const waBtn = document.createElement('button');
+                        waBtn.className = 'btn wa-new-btn';
+                        waBtn.innerHTML = '📱 واتساب';
+                        waBtn.style.cssText = 'background:#25D366;color:white;margin-left:5px;padding:5px 10px;border-radius:8px;border:none;cursor:pointer;font-size:12px;';
+                        waBtn.onclick = () => sendWADebt(phone, name, balance, type);
+                        
+                        const actionCell = cells[4];
+                        if (actionCell) actionCell.appendChild(waBtn);
+                    }
+                }
             });
-        });
+        }
+        
+        // جدول الأرصدة (balancesDetailedList)
+        const balancesTable = document.getElementById('balancesDetailedList');
+        if (balancesTable) {
+            const rows = balancesTable.querySelectorAll('tr');
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 5 && !row.querySelector('.wa-new-btn')) {
+                    const name = cells[0]?.innerText || '';
+                    const phone = cells[2]?.innerText || '';
+                    const balanceText = cells[3]?.innerText?.replace(/[^0-9-]/g, '') || '0';
+                    const balance = parseFloat(balanceText) || 0;
+                    const type = cells[1]?.innerText === 'عميل' ? 'customer' : 'supplier';
+                    
+                    if (phone && phone !== '-' && phone !== 'غير مسجل') {
+                        const waBtn = document.createElement('button');
+                        waBtn.className = 'btn wa-new-btn';
+                        waBtn.innerHTML = '📱 واتساب';
+                        waBtn.style.cssText = 'background:#25D366;color:white;margin-left:5px;padding:5px 10px;border-radius:8px;border:none;cursor:pointer;font-size:12px;';
+                        waBtn.onclick = () => sendWADebt(phone, name, balance, type);
+                        
+                        const actionCell = cells[4];
+                        if (actionCell) actionCell.appendChild(waBtn);
+                    }
+                }
+            });
+        }
     }
-
-    // ========== مراقبة تغيير اسم المحل ==========
-    const originalSetStoreName = window.setStoreName;
-    if (originalSetStoreName) {
-        window.setStoreName = function(newName) {
-            originalSetStoreName(newName);
-            localStorage.setItem('storeName', newName);
-            localStorage.setItem('custom_store_name', newName);
-            console.log('🏪 تم تحديث اسم المحل إلى:', newName);
-        };
-    }
-
-    // مراقبة وإضافة الأزرار
-    const observer = new MutationObserver(() => {
-        addWAStatementBtn();
-        addWATableBtns();
-    });
+    
+    // مراقبة التغييرات وإضافة الأزرار
+    const observer = new MutationObserver(() => addWAButtons());
     observer.observe(document.body, { childList: true, subtree: true });
     
-    setInterval(() => {
-        addWAStatementBtn();
-        addWATableBtns();
-    }, 3000);
+    // تنفيذ فوري
+    setTimeout(addWAButtons, 1000);
+    setTimeout(addWAButtons, 3000);
+    setTimeout(addWAButtons, 5000);
     
-    setTimeout(addWAStatementBtn, 1500);
-    setTimeout(addWATableBtns, 1500);
-    
-    // إضافة أيقونات Font Awesome
-    if (!document.querySelector('link[href*="font-awesome"]')) {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css';
-        document.head.appendChild(link);
-    }
-    
-    console.log('✅ واتساب يعمل - الاسم الديناميكي: ' + getStoreName());
+    console.log('✅ جاري إضافة أزرار واتساب...');
 })();
 </script>
 <script>
 // ============================================================
-// واتساب - إصلاح تذكير المديونية (إرسال المبلغ)
+// إرسال كشف حساب كامل 100% عبر واتساب (بدون نقصان)
 // ============================================================
 (function() {
     'use strict';
 
-    // جلب اسم المحل الديناميكي
+    // دالة جلب اسم المحل
     function getStoreName() {
         let name = localStorage.getItem('storeName');
         if (!name) name = localStorage.getItem('custom_store_name');
         if (!name) {
-            const title = document.querySelector('#main-system .shop-title h1');
-            if (title) name = title.innerText.replace('🏪', '').trim();
+            const titleEl = document.querySelector('#main-system .shop-title h1');
+            if (titleEl) name = titleEl.innerText.replace('🏪', '').trim();
         }
         return name || 'محلات سليمان للتجارة العامة';
     }
@@ -9780,85 +9529,241 @@ window.addToGrid = function() {
         if (!phone) return null;
         let numbers = phone.toString().trim().replace(/[^0-9]/g, '');
         if (!numbers || numbers.length < 8) return null;
-        if (numbers.length === 9 && numbers.startsWith('7')) {
-            numbers = '967' + numbers;
-        } else if (numbers.startsWith('0')) {
-            numbers = '967' + numbers.substring(1);
-        } else if (!numbers.startsWith('967')) {
-            numbers = '967' + numbers;
-        }
+        if (numbers.length === 9 && numbers.startsWith('7')) numbers = '967' + numbers;
+        else if (numbers.startsWith('0')) numbers = '967' + numbers.substring(1);
+        else if (!numbers.startsWith('967')) numbers = '967' + numbers;
         return numbers;
     }
 
     // إرسال واتساب
-    window.sendWA = function(phone, message) {
+    window.sendFullStatementWA = function(phone, message) {
         const clean = cleanPhone(phone);
         if (!clean) {
-            if (typeof showToast === 'function') showToast('⚠️ رقم غير صالح', 'error');
-            else alert('رقم غير صالح');
+            if (typeof showToast === 'function') showToast('⚠️ رقم الهاتف غير صالح', 'error');
+            else alert('رقم الهاتف غير صالح');
             return false;
         }
-        window.open(`https://wa.me/${clean}?text=${encodeURIComponent(message)}`, '_blank');
-        if (typeof showToast === 'function') showToast('📱 تم فتح واتساب', 'success');
+        const url = `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
+        if (typeof showToast === 'function') showToast('📱 تم إرسال كشف الحساب', 'success');
         return true;
     };
 
-    // ========== إصلاح دالة تذكير الديون ==========
-    // نستبدل الدالة القديمة بالكامل
-    window.sendDebtReminder = function(contactId, contactName, contactType, balance, phone) {
-        console.log('📞 تذكير دين:', { contactId, contactName, contactType, balance, phone });
+    // ========== دالة إنشاء كشف حساب كامل 100% ==========
+    window.generateFullStatement = async function(contact) {
+        if (!contact) return null;
         
-        // التحقق من وجود رقم الهاتف
-        if (!phone || phone === '-' || phone === 'غير مسجل') {
-            if (typeof showToast === 'function') {
-                showToast('⚠️ لا يوجد رقم هاتف مسجل لهذا الاسم', 'error');
-            } else {
-                alert('لا يوجد رقم هاتف مسجل');
-            }
-            return;
+        // جلب جميع الفواتير
+        const invKeys = await invoicesStore.keys();
+        const invoices = [];
+        for (const k of invKeys) {
+            const inv = await invoicesStore.getItem(k);
+            if (inv && inv.contact_id === contact.id) invoices.push(inv);
+        }
+        invoices.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        
+        // جلب جميع السندات
+        const payKeys = await paymentsStore.keys();
+        const payments = [];
+        for (const k of payKeys) {
+            const p = await paymentsStore.getItem(k);
+            if (p && p.contact_id === contact.id) payments.push(p);
+        }
+        payments.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        
+        // جلب جميع الأصناف
+        const itemKeys = await invoiceItemsStore.keys();
+        const allItems = [];
+        for (const k of itemKeys) {
+            const item = await invoiceItemsStore.getItem(k);
+            if (item) allItems.push(item);
         }
         
-        // التأكد من أن المبلغ رقم صحيح
-        const balanceNum = parseFloat(balance) || 0;
-        const formattedBalance = Math.abs(balanceNum).toLocaleString();
         const storeName = getStoreName();
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('ar-YE');
+        const timeStr = now.toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' });
         
-        // بناء نص المديونية حسب النوع
-        let debtText = '';
-        if (contactType === 'customer') {
-            // عميل
-            if (balanceNum > 0) {
-                debtText = `عليك مبلغ وقدره ${formattedBalance} ريال`;
-            } else if (balanceNum < 0) {
-                debtText = `لك مبلغ وقدره ${formattedBalance} ريال`;
-            } else {
-                debtText = `لا توجد أي مديونية`;
+        // بناء الرسالة خطوة بخطوة
+        let msg = `🏪 *${storeName}*\n`;
+        msg += `📊 *كشف حساب تفصيلي*\n`;
+        msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        msg += `👤 *الاسم:* ${contact.full_name}\n`;
+        msg += `📌 *النوع:* ${contact.contact_type === 'customer' ? 'عميل' : 'مورد'}\n`;
+        msg += `📞 *الهاتف:* ${contact.phone || 'غير مسجل'}\n`;
+        msg += `📅 *التاريخ:* ${dateStr} - ${timeStr}\n`;
+        msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        
+        // ========== الفواتير بالتفصيل ==========
+        let totalInvoices = 0;
+        let totalPaid = 0;
+        
+        if (invoices.length > 0) {
+            msg += `📋 *الفواتير (${invoices.length}):*\n`;
+            msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+            
+            for (let i = 0; i < invoices.length; i++) {
+                const inv = invoices[i];
+                totalInvoices += inv.total_amount || 0;
+                totalPaid += inv.paid_amount || 0;
+                
+                let typeIcon = '';
+                let typeText = '';
+                if (inv.invoice_type === 'sale') { typeIcon = '💰'; typeText = 'فاتورة بيع'; }
+                else if (inv.invoice_type === 'purchase') { typeIcon = '🛒'; typeText = 'فاتورة شراء'; }
+                else if (inv.invoice_type === 'sale_return') { typeIcon = '🔄'; typeText = 'مرتجع بيع'; }
+                else { typeIcon = '↩️'; typeText = 'مرتجع شراء'; }
+                
+                const invDate = new Date(inv.created_at).toLocaleDateString('ar-YE');
+                const remaining = (inv.total_amount || 0) - (inv.paid_amount || 0);
+                
+                msg += `\n${typeIcon} *${typeText}* #${i+1}\n`;
+                msg += `   📅 التاريخ: ${invDate}\n`;
+                msg += `   🆔 الرقم: ${inv.id.slice(-8)}\n`;
+                
+                // جلب أصناف هذه الفاتورة
+                const invoiceItems = allItems.filter(item => item.invoice_id === inv.id);
+                if (invoiceItems.length > 0) {
+                    msg += `   📦 *الأصناف:*\n`;
+                    for (const item of invoiceItems) {
+                        const product = cachedProducts.find(p => p.id === item.product_id);
+                        const productName = product?.name || 'منتج غير معروف';
+                        const qty = item.quantity || 0;
+                        const price = item.unit_price || 0;
+                        const itemTotal = qty * price;
+                        msg += `      • ${productName}\n`;
+                        msg += `        الكمية: ${qty} × ${price.toLocaleString()} = ${itemTotal.toLocaleString()} ريال\n`;
+                    }
+                }
+                
+                msg += `   💵 *الإجمالي:* ${(inv.total_amount || 0).toLocaleString()} ريال\n`;
+                msg += `   ✅ *المدفوع:* ${(inv.paid_amount || 0).toLocaleString()} ريال\n`;
+                msg += `   📋 *المتبقي:* ${remaining.toLocaleString()} ريال\n`;
+                msg += `   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
             }
         } else {
-            // مورد
-            if (balanceNum < 0) {
-                debtText = `لنا عندك مبلغ وقدره ${formattedBalance} ريال`;
-            } else if (balanceNum > 0) {
-                debtText = `لك علينا مبلغ وقدره ${formattedBalance} ريال`;
-            } else {
-                debtText = `لا توجد أي مديونية`;
+            msg += `📋 *لا توجد فواتير مسجلة*\n`;
+        }
+        
+        // ========== السندات ==========
+        let totalReceipts = 0;
+        let totalPaymentsOut = 0;
+        
+        if (payments.length > 0) {
+            msg += `\n💰 *السندات (${payments.length}):*\n`;
+            msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+            
+            for (const p of payments) {
+                const pDate = new Date(p.created_at).toLocaleDateString('ar-YE');
+                const amount = p.amount || 0;
+                if (p.payment_type === 'receipt') {
+                    totalReceipts += amount;
+                    msg += `   📥 *سند قبض* | ${pDate} | ${amount.toLocaleString()} ريال\n`;
+                } else {
+                    totalPaymentsOut += amount;
+                    msg += `   📤 *سند صرف* | ${pDate} | ${amount.toLocaleString()} ريال\n`;
+                }
+                if (p.notes && p.notes.trim()) {
+                    msg += `      📝 ملاحظات: ${p.notes}\n`;
+                }
             }
-        }
-        
-        // بناء الرسالة النهائية
-        const msg = `${storeName}\nتسوية حساب\nالاسم: ${contactName}\nالمبلغ: ${debtText}\nالتاريخ: ${new Date().toLocaleDateString('ar-YE')}`;
-        
-        // سؤال المستخدم: واتساب أو SMS
-        const useWhatsApp = confirm(`📱 إرسال رسالة إلى ${contactName} عبر واتساب؟\n\n"موافق" = واتساب\n"إلغاء" = رسالة SMS`);
-        
-        if (useWhatsApp) {
-            window.sendWA(phone, msg);
         } else {
-            window.location.href = `sms:${phone}?body=${encodeURIComponent(msg)}`;
+            msg += `\n💰 *لا توجد سندات مسجلة*\n`;
         }
+        
+        // ========== الإجماليات النهائية ==========
+        const finalBalance = contact.balance || 0;
+        const netTotal = totalInvoices - totalPaid;
+        
+        msg += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        msg += `📊 *الإجماليات النهائية:*\n`;
+        msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        msg += `   📋 *إجمالي الفواتير:* ${totalInvoices.toLocaleString()} ريال\n`;
+        msg += `   ✅ *إجمالي المدفوع:* ${totalPaid.toLocaleString()} ريال\n`;
+        msg += `   📥 *سندات القبض:* ${totalReceipts.toLocaleString()} ريال\n`;
+        msg += `   📤 *سندات الصرف:* ${totalPaymentsOut.toLocaleString()} ريال\n`;
+        msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        
+        if (finalBalance > 0) {
+            msg += `💎 *الرصيد المتبقي:* ${finalBalance.toLocaleString()} ريال (على العميل)\n`;
+        } else if (finalBalance < 0) {
+            msg += `💎 *الرصيد المتبقي:* ${Math.abs(finalBalance).toLocaleString()} ريال (لصالح العميل)\n`;
+        } else {
+            msg += `💎 *الرصيد:* 0 ريال (مسدد بالكامل)\n`;
+        }
+        
+        msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        msg += `🤝 شكراً لتعاملكم مع *${storeName}*\n`;
+        
+        return msg;
     };
 
-    console.log('✅ تم إصلاح تذكير المديونية - سيرسل المبلغ بشكل صحيح');
+    // ========== إضافة زر واتساب في نافذة كشف الحساب ==========
+    function addFullStatementWABtn() {
+        const modal = document.getElementById('statementModal');
+        if (!modal) return;
+        
+        const pdfBtn = modal.querySelector('.btn-pdf');
+        if (!pdfBtn) return;
+        
+        if (document.getElementById('fullStatementWABtn')) return;
+        
+        const waBtn = document.createElement('button');
+        waBtn.id = 'fullStatementWABtn';
+        waBtn.className = 'btn';
+        waBtn.style.cssText = 'background:#25D366;color:white;margin-left:10px;border-radius:60px;padding:10px 15px;cursor:pointer;border:none;';
+        waBtn.innerHTML = '📱 إرسال كشف الحساب كاملاً (واتساب)';
+        
+        waBtn.onclick = async () => {
+            // البحث عن الاسم المعروض
+            let contactName = null;
+            const nameElement = document.querySelector('#statementResult .statement-header h3');
+            if (nameElement) contactName = nameElement.innerText.trim();
+            if (!contactName) {
+                const input = document.getElementById('statementSearchInput');
+                if (input && input.value) contactName = input.value.trim();
+            }
+            
+            if (!contactName) {
+                alert('⚠️ الرجاء البحث عن اسم ثم الضغط على "عرض" أولاً');
+                return;
+            }
+            
+            // البحث عن جهة الاتصال
+            const contact = cachedContacts.find(c => c.full_name === contactName || c.full_name.includes(contactName));
+            if (!contact) {
+                alert('⚠️ لم يتم العثور على الاسم: ' + contactName);
+                return;
+            }
+            
+            if (!contact.phone) {
+                alert('⚠️ لا يوجد رقم هاتف مسجل للاسم: ' + contact.full_name);
+                return;
+            }
+            
+            // إنشاء كشف الحساب الكامل
+            const fullMessage = await window.generateFullStatement(contact);
+            if (fullMessage) {
+                window.sendFullStatementWA(contact.phone, fullMessage);
+            }
+        };
+        
+        // إضافة الزر قبل زر PDF
+        pdfBtn.parentNode.insertBefore(waBtn, pdfBtn);
+    }
+    
+    // مراقبة ظهور نافذة كشف الحساب
+    const observer = new MutationObserver(() => {
+        const modal = document.getElementById('statementModal');
+        if (modal && modal.style.display === 'block') {
+            setTimeout(addFullStatementWABtn, 500);
+        }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    setTimeout(addFullStatementWABtn, 2000);
+    
+    console.log('✅ تم تفعيل إرسال كشف الحساب الكامل 100% عبر واتساب');
 })();
 </script>
 </body>
